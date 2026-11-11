@@ -1,4 +1,4 @@
-from core import Atributos
+from core.Atributos import Atributos
 
 class Personagem:
     def __init__(self, nome, vida, nivel, forca, vitalidade, defesa):
