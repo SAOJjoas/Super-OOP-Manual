@@ -1,4 +1,4 @@
-from entidades.Personagem import Personagem
+from entidades import Personagem
 
 
 class Player(Personagem):
