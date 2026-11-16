@@ -12,6 +12,11 @@ class Combate:
         dano_bruto = atacante.atributos.ataque_total - defensor.atributos.defesa_total
         return max(1, dano_bruto)
 
+    def obter_arma(self, entidade):
+        if hasattr(entidade, "inventario"):
+            return entidade.inventario.equipados.get("arma")
+        return getattr(entidade, "arma_equipada", None)
+
     def atacar(self, atacante, defensor):
         if not atacante.atributos.esta_vivo:
             return f"{atacante.nome} não pode mais atacar!"
@@ -20,6 +25,12 @@ class Combate:
         defensor.atributos.receber_dano(dano)
 
         mensagem = f"{atacante.nome} atacou {defensor.nome}\nDano: {dano}"
+
+        arma = self.obter_arma(atacante)
+        if arma and hasattr(arma, "ao_causar_dano"):
+            efeito = arma.ao_causar_dano(atacante, defensor, dano)
+            if efeito:
+                mensagem += f"\n{efeito}"
 
         if not defensor.atributos.esta_vivo:
             mensagem += f"\n{defensor.nome} foi derrotado!"
@@ -32,7 +43,14 @@ class Combate:
 
         eventos = [f"--- Turno {self.turno} ---"]
 
-        eventos.append(self.atacar(self.player, self.inimigo))
+        arma_player = self.obter_arma(self.player)
+        if arma_player and hasattr(arma_player, "ao_iniciar_turno"):
+            efeito_turno = arma_player.ao_iniciar_turno(self.player)
+            if efeito_turno:
+                eventos.append(efeito_turno)
+
+        if self.player.atributos.esta_vivo:
+            eventos.append(self.atacar(self.player, self.inimigo))
 
         if self.inimigo.atributos.esta_vivo:
             eventos.append(self.atacar(self.inimigo, self.player))
