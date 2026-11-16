@@ -12,10 +12,24 @@ class Combate:
         dano_bruto = atacante.atributos.ataque_total - defensor.atributos.defesa_total
         return max(1, dano_bruto)
 
-    def obter_arma(self, entidade):
+    def obter_equipamentos(self, entidade):
+        """Retorna lista com todos os itens equipados (arma, armadura, etc.)."""
         if hasattr(entidade, "inventario"):
-            return entidade.inventario.equipados.get("arma")
-        return getattr(entidade, "arma_equipada", None)
+            return [item for item in entidade.inventario.equipados.values() if item is not None]
+        return [
+            item for item in (
+                getattr(entidade, "arma_equipada", None),
+                getattr(entidade, "armadura_equipada", None)
+            )
+            if item is not None
+        ]
+
+    def _processar_inicio_turno(self, entidade, eventos):
+        for item in self.obter_equipamentos(entidade):
+            if hasattr(item, "ao_iniciar_turno"):
+                efeito = item.ao_iniciar_turno(entidade)
+                if efeito:
+                    eventos.append(efeito)
 
     def atacar(self, atacante, defensor):
         if not atacante.atributos.esta_vivo:
@@ -26,14 +40,22 @@ class Combate:
 
         mensagem = f"{atacante.nome} atacou {defensor.nome}\nDano: {dano}"
 
-        arma = self.obter_arma(atacante)
-        if arma and hasattr(arma, "ao_causar_dano"):
-            efeito = arma.ao_causar_dano(atacante, defensor, dano)
-            if efeito:
-                mensagem += f"\n{efeito}"
+        for item in self.obter_equipamentos(atacante):
+            if hasattr(item, "ao_causar_dano"):
+                efeito = item.ao_causar_dano(atacante, defensor, dano)
+                if efeito:
+                    mensagem += f"\n{efeito}"
+
+        for item in self.obter_equipamentos(defensor):
+            if hasattr(item, "ao_receber_dano"):
+                efeito = item.ao_receber_dano(defensor, atacante, dano)
+                if efeito:
+                    mensagem += f"\n{efeito}"
 
         if not defensor.atributos.esta_vivo:
             mensagem += f"\n{defensor.nome} foi derrotado!"
+        if not atacante.atributos.esta_vivo:
+            mensagem += f"\n{atacante.nome} foi derrotado pelos próprios ferimentos!"
 
         return mensagem
 
@@ -43,17 +65,25 @@ class Combate:
 
         eventos = [f"--- Turno {self.turno} ---"]
 
-        arma_player = self.obter_arma(self.player)
-        if arma_player and hasattr(arma_player, "ao_iniciar_turno"):
-            efeito_turno = arma_player.ao_iniciar_turno(self.player)
-            if efeito_turno:
-                eventos.append(efeito_turno)
+        self._processar_inicio_turno(self.player, eventos)
+        if not self.combate_ativo:
+            if not self.inimigo.atributos.esta_vivo:
+                eventos.append(f"{self.inimigo.nome} foi derrotado!")
+            if not self.player.atributos.esta_vivo:
+                eventos.append(f"{self.player.nome} foi derrotado!")
+            return eventos
 
-        if self.player.atributos.esta_vivo:
-            eventos.append(self.atacar(self.player, self.inimigo))
+        eventos.append(self.atacar(self.player, self.inimigo))
 
-        if self.inimigo.atributos.esta_vivo:
-            eventos.append(self.atacar(self.inimigo, self.player))
+        if self.combate_ativo:
+            self._processar_inicio_turno(self.inimigo, eventos)
+            if self.combate_ativo:
+                eventos.append(self.atacar(self.inimigo, self.player))
+            else:
+                if not self.player.atributos.esta_vivo:
+                    eventos.append(f"{self.player.nome} foi derrotado!")
+                if not self.inimigo.atributos.esta_vivo:
+                    eventos.append(f"{self.inimigo.nome} foi derrotado!")
 
         self.turno += 1
         return eventos

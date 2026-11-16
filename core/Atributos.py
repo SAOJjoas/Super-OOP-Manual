@@ -26,4 +26,4 @@ class Atributos:
         self.vida_atual = max(0, self.vida_atual - quantidade)
 
     def curar(self, quantidade):
-        self.vida_atual = max(self.vida_maxima, self.vida_atual + quantidade)
+        self.vida_atual = min(self.vida_maxima, self.vida_atual + quantidade)
